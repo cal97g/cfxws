@@ -3,7 +3,7 @@ Cryptocurrency websockets.
 
 The aim of this library is to provide a standardised interface for retrieving websockets data from cryptocurrency exchanges.
 
-# Exchanges
+## Exchanges
 
 |EXCHANGE|STATUS|
 |:-:|:-:|
@@ -13,5 +13,5 @@ The aim of this library is to provide a standardised interface for retrieving we
 |BITTREX|PRIV??|
 |KUCOIN|PRIV??|
 
-# Quickstart
+## Quickstart
 We need some code first!
