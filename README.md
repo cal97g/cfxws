@@ -18,7 +18,7 @@ The aim of this library is to provide a standardised interface for retrieving we
 While the project does not have a working exchange yet I envision the usage api to look something like this:
 
 ```python
-async def handle_trade(data):
+def handle_trade(data):
     print("trade from {}-{}. Last price {}".format(
         data['exchange'],
         data['symbol'],
