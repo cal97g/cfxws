@@ -15,12 +15,7 @@ def echo_trade(data):
 
 
 factory = WebSocketClientFactory("wss://stream.binance.com:9443/stream?streams=adabtc@trade/")
-factory.protocol = WSClient(
-        "wss://stream.binance.com:9443/stream?streams=adabtc@trade/",
-        43200,
-        echo_trade,
-        b._handle_response
-    )
+factory.protocol = WSClient
 if factory.isSecure:
     contextFactory = ssl.ClientContextFactory()
 else:
