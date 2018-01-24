@@ -1,5 +1,6 @@
-from exchange import Binance
+import exchange
+import client
 
 exchanges = {
-    "Binance": Binance,
+    "binance": Binance
 }

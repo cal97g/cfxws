@@ -4,8 +4,7 @@ import json
 import ccxt
 
 from abc import ABCMeta, abstractmethod
-from . import CfxwsWSClient
-
+from client import WSClient
 
 class Exchange(object):
     """
@@ -55,10 +54,7 @@ class Exchange(object):
         """
         raise NotImplementedError("Child class should implement listen_ticks()")
 
-
-
-
-class Binance(Exchange):
+class Binance(object):
     """
         The base endpoint is: wss://stream.binance.com:9443
         Streams can be access either in a single raw stream or a combined stream
@@ -68,27 +64,30 @@ class Binance(Exchange):
         All symbols for streams are lowercase
         A single connection to stream.binance.com is only valid for 24 hours; expect to be disconnected at the 24 hour mark
     """
-    self.exchange = 'binance'
-    self.wssuri = 'wss://stream.binance.com:9443'
-    self.channel_map = {
-        "listen_all_ticker": "!ticker@arr",
-        "listen_ticker": "<symbol>@ticker"
-        "listen_trade": "<symbol>@trade",
-        "listen_agg_trade": "<symbol>@aggTrade",
-        "candles": "<symbol>@kline_<interval>"
-    }
 
-    # Renew period is 24h, let's renew every 12h.
-    # I'm sure I've been dced in less than 24h.
-    self.renew_period_s = 43200
 
     def __init__(self):
         # In the case a user does not specify symbols, we will use all of them.
-        with ccxt.binance() as ex:
-            tmp_markets = ex.load_markets()
+        ex = ccxt.binance({'enableRateLimit': False})
+        tmp_markets = ex.loadMarkets()
 
-            self.all_markets = [str(x['symbol'].lower().replace('/', '')
-            for x in tmp_markets]
+        self.all_markets = [x.lower().replace('/', '')
+        for x in tmp_markets.keys()]
+
+        self.exchange = 'binance'
+        self.wssuri = 'wss://stream.binance.com:9443'
+        self.wssport = 9443
+        self.channel_map = {
+            "listen_all_ticker": "!ticker@arr",
+            "listen_ticker": "<symbol>@ticker",
+            "listen_trade": "<symbol>@trade",
+            "listen_agg_trade": "<symbol>@aggTrade",
+            "candles": "<symbol>@kline_<interval>"
+        }
+
+        # Renew period is 24h, let's renew every 12h.
+        # I'm sure I've been dced in less than 24h.
+        self.renew_period_s = 43200
 
     def _standard_pairs_to_exchange(expairs):
         pass
@@ -162,7 +161,7 @@ class Binance(Exchange):
 
             :param action: method which will handle the tick data
             :param pairs: list or None. List of symbols to listen to.
-            :return CfxwsWSClient instance:
+            :return WSClient instance:
         """
         if not pairs:
             pairs = self.all_markets
@@ -189,14 +188,14 @@ class Binance(Exchange):
             stream_url = self.wssuri + '/stream?streams=' + self.channel_map['listen_all_ticker']
 
 
-        ws = CfxwsWSClient(
+        ws = WSClient(
             stream_url, self.renew_period_s, handle_method =  action,
             _handle_data = self._handle_response
         )
 
         ws.listen()
 
-    def listen_trade(self, action, pairs = None):
+    def listen_trades(self, action, pairs = None):
         """
             Will listen to binance trades. Use this to get the last trade price.
             Pass pairs in 'btceth' format. If no pairs we will listen to all
@@ -220,18 +219,23 @@ class Binance(Exchange):
 
             :param action: method which will handle the trade data
             :param pairs: list or None. List of symbols to listen to.
-            :return CfxwsWSClient instance:
+            :return WSClient instance:
         """
 
         if not pairs:
             pairs = self.all_markets
         else:
-            if not isinstance(list, pairs):
+            if not isinstance(pairs, list):
                 raise ValueError("Pairs must be list or None. Ex: ['btceth'],['btceth', 'btcada']")
 
-        channels = [self.channel_map['listen_trades'].replace('<symbol>', x) for pair in pairs]
+        channels = [self.channel_map['listen_trade'].replace('<symbol>', pair) for pair in pairs]
 
-        ws = CfxwsWSClient(
+        stream_url = self.wssuri + '/stream?streams='
+        for channel in channels:
+            stream_url += str(channel + '/')
+        stream_url[:-1]
+
+        ws = WSClient(
             stream_url, self.renew_period_s, handle_method =  action,
             _handle_data = self._handle_response
         )
