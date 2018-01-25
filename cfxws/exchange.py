@@ -16,10 +16,10 @@ class Exchange(object):
     """
         Baseclass for all exchanges
     """
-
+ 
     def _key_map_to_standard(self, keymap, tickdict):
         new_dict = {}
-        for key, value in keymap.values():
+        for key, value in keymap.items():
             new_dict[value] =  tickdict[key]
         return new_dict
 
@@ -60,7 +60,7 @@ class Exchange(object):
         """
         raise NotImplementedError("Child class should implement listen_ticks()")
 
-class Binance(object):
+class Binance(Exchange):
     """
         The base endpoint is: wss://stream.binance.com:9443
         Streams can be access either in a single raw stream or a combined stream
@@ -98,7 +98,7 @@ class Binance(object):
     def _standard_pairs_to_exchange(expairs):
         pass
 
-    def _standardise_objects(self, type, data):
+    def _standardise_object(self, type, data):
         if type == 'tick':
             keymap = {
                 "E": "timestamp",
@@ -106,11 +106,11 @@ class Binance(object):
                 "a": "ask",
                 "s": "symbol"
             }
-            new_tick_dict = Exchange._key_map_to_standard(keymap, data)
+            new_tick_dict = self._key_map_to_standard(keymap, data)
             new_tick_dict['datetime'] = datetime.datetime.fromtimestamp(
-                new_tick_dict['timestamp']
+                new_tick_dict['timestamp'] / 1000.0
             )
-            new_tick_dict['original'] = tickdict
+            new_tick_dict['original'] = data
             new_tick_dict['exchange'] = self.exchange
             return new_tick_dict
         elif type == 'trade':
@@ -135,11 +135,11 @@ class Binance(object):
         else:
             raise ValueError("invalid object type")
 
-    def _handle_response(self, type, response):
+    def _handle_response(self, response, type):
         """
             Take raw json and dictify
         """
-        return _standardise_object(type, data = json.loads(response)['data'])
+        return self._standardise_object(type, data = json.loads(response)['data'])
 
     def listen_ticks(self, action, pairs = None):
         """
@@ -196,7 +196,7 @@ class Binance(object):
         factory = WebSocketClientFactory(stream_url)
 
         MyWs = WSClient
-        MyWs._handle_data = self._handle_response
+        MyWs._handle_response = self._handle_response
         MyWs.handle_method = action
 
         factory.protocol = MyWs
