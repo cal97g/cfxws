@@ -5,6 +5,12 @@ import ccxt
 
 from abc import ABCMeta, abstractmethod
 from client import WSClient
+from twisted.python import log
+from twisted.internet import reactor, ssl
+
+from autobahn.twisted.websocket import WebSocketClientProtocol
+from autobahn.twisted.websocket import WebSocketClientFactory
+from autobahn.twisted.websocket import connectWS
 
 class Exchange(object):
     """
@@ -135,7 +141,6 @@ class Binance(object):
         """
         return _standardise_object(type, data = json.loads(response)['data'])
 
-
     def listen_ticks(self, action, pairs = None):
         """
             Will listen to binance ticks. Pass pairs in 'btceth' format.
@@ -166,13 +171,13 @@ class Binance(object):
         if not pairs:
             pairs = self.all_markets
         else:
-            if not isinstance(list, pairs):
+            if not isinstance(pairs, list):
                 raise ValueError(
                 "Pairs must be list or None. Ex: \
                 ['btceth'],['btceth', 'btcada']"
                 )
 
-        channels = [self.channel_map['listen_ticks'].replace('<symbol>', x)
+        channels = [self.channel_map['listen_ticker'].replace('<symbol>', pair)
         for pair in pairs]
 
         # Make channels url...
@@ -188,12 +193,20 @@ class Binance(object):
             stream_url = self.wssuri + '/stream?streams=' + self.channel_map['listen_all_ticker']
 
 
-        ws = WSClient(
-            stream_url, self.renew_period_s, handle_method =  action,
-            _handle_data = self._handle_response
-        )
+        factory = WebSocketClientFactory(stream_url)
 
-        ws.listen()
+        MyWs = WSClient
+        MyWs._handle_data = self._handle_response
+        MyWs.handle_method = action
+
+        factory.protocol = MyWs
+        if factory.isSecure:
+            contextFactory = ssl.ClientContextFactory()
+        else:
+            contextFactory = None
+
+        connectWS(factory, contextFactory)
+        reactor.run()
 
     def listen_trades(self, action, pairs = None):
         """
@@ -234,10 +247,3 @@ class Binance(object):
         for channel in channels:
             stream_url += str(channel + '/')
         stream_url[:-1]
-
-        ws = WSClient(
-            stream_url, self.renew_period_s, handle_method =  action,
-            _handle_data = self._handle_response
-        )
-
-        ws.listen()

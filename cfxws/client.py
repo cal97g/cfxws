@@ -30,8 +30,10 @@ class WSClient(WebSocketClientProtocol):
 
     def onOpen(self):
         pass
-    def _handle_data(self, response):
+
+    def _handle_response(self, response):
         return json.loads(response)['data']
+
     def handle_method(self, data):
         print(data)
         #print("{} {} {} {}".format(data['symbol'], data['exchange'], data['quantity'], data['price']))
@@ -40,7 +42,7 @@ class WSClient(WebSocketClientProtocol):
         if isBinary:
             raise AttributeError('Must not be binary. Binary sucks.')
         else:
-            self.handle_method(self._handle_data(payload.decode('utf8')))
+            self.handle_method(self._handle_response(payload.decode('utf8')))
 
     def _create_ws_factory(self):
         """
