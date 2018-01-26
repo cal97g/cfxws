@@ -4,7 +4,7 @@ import json
 import ccxt
 
 from abc import ABCMeta, abstractmethod
-from client import WSClient
+from cfxws.client import WSClient
 from twisted.python import log
 from twisted.internet import reactor, ssl
 
@@ -16,7 +16,7 @@ class Exchange(object):
     """
         Baseclass for all exchanges
     """
- 
+
     def _key_map_to_standard(self, keymap, tickdict):
         new_dict = {}
         for key, value in keymap.items():
@@ -84,11 +84,11 @@ class Binance(Exchange):
         self.wssuri = 'wss://stream.binance.com:9443'
         self.wssport = 9443
         self.channel_map = {
-            "listen_all_ticker": "!ticker@arr",
-            "listen_ticker": "<symbol>@ticker",
+            "listen_all_tick": "!ticker@arr",
+            "listen_tick": "<symbol>@ticker",
             "listen_trade": "<symbol>@trade",
             "listen_agg_trade": "<symbol>@aggTrade",
-            "candles": "<symbol>@kline_<interval>"
+            "candle": "<symbol>@kline_<interval>"
         }
 
         # Renew period is 24h, let's renew every 12h.
@@ -177,7 +177,7 @@ class Binance(Exchange):
                 ['btceth'],['btceth', 'btcada']"
                 )
 
-        channels = [self.channel_map['listen_ticker'].replace('<symbol>', pair)
+        channels = [self.channel_map['listen_tick'].replace('<symbol>', pair)
         for pair in pairs]
 
         # Make channels url...
@@ -190,7 +190,7 @@ class Binance(Exchange):
         # If we want all lists we may as well use the all pair channel built in
         # by binance.
         if pairs is None:
-            stream_url = self.wssuri + '/stream?streams=' + self.channel_map['listen_all_ticker']
+            stream_url = self.wssuri + '/stream?streams=' + self.channel_map['listen_all_tick']
 
 
         factory = WebSocketClientFactory(stream_url)
@@ -247,3 +247,18 @@ class Binance(Exchange):
         for channel in channels:
             stream_url += str(channel + '/')
         stream_url[:-1]
+
+        factory = WebSocketClientFactory(stream_url)
+
+        MyWs = WSClient
+        MyWs._handle_response = self._handle_response
+        MyWs.handle_method = action
+
+        factory.protocol = MyWs
+        if factory.isSecure:
+            contextFactory = ssl.ClientContextFactory()
+        else:
+            contextFactory = None
+
+        connectWS(factory, contextFactory)
+        reactor.run()
