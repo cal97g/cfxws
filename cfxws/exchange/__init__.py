@@ -192,6 +192,7 @@ class Binance(Exchange):
         if pairs is None:
             stream_url = self.wssuri + '/stream?streams=' + self.channel_map['listen_all_tick']
 
+        # Move this to a method - DRY
 
         factory = WebSocketClientFactory(stream_url)
 
@@ -247,6 +248,8 @@ class Binance(Exchange):
         for channel in channels:
             stream_url += str(channel + '/')
         stream_url[:-1]
+
+        # Move this to a method - DRY
 
         factory = WebSocketClientFactory(stream_url)
 
