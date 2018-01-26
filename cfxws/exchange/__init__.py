@@ -4,7 +4,13 @@ import json
 import ccxt
 
 from abc import ABCMeta, abstractmethod
-from client import WSClient
+from cfxws.client import WSClient
+from twisted.python import log
+from twisted.internet import reactor, ssl
+
+from autobahn.twisted.websocket import WebSocketClientProtocol
+from autobahn.twisted.websocket import WebSocketClientFactory
+from autobahn.twisted.websocket import connectWS
 
 class Exchange(object):
     """
@@ -13,7 +19,7 @@ class Exchange(object):
 
     def _key_map_to_standard(self, keymap, tickdict):
         new_dict = {}
-        for key, value in keymap.values():
+        for key, value in keymap.items():
             new_dict[value] =  tickdict[key]
         return new_dict
 
@@ -54,7 +60,7 @@ class Exchange(object):
         """
         raise NotImplementedError("Child class should implement listen_ticks()")
 
-class Binance(object):
+class Binance(Exchange):
     """
         The base endpoint is: wss://stream.binance.com:9443
         Streams can be access either in a single raw stream or a combined stream
@@ -78,11 +84,11 @@ class Binance(object):
         self.wssuri = 'wss://stream.binance.com:9443'
         self.wssport = 9443
         self.channel_map = {
-            "listen_all_ticker": "!ticker@arr",
-            "listen_ticker": "<symbol>@ticker",
+            "listen_all_tick": "!ticker@arr",
+            "listen_tick": "<symbol>@ticker",
             "listen_trade": "<symbol>@trade",
             "listen_agg_trade": "<symbol>@aggTrade",
-            "candles": "<symbol>@kline_<interval>"
+            "candle": "<symbol>@kline_<interval>"
         }
 
         # Renew period is 24h, let's renew every 12h.
@@ -92,7 +98,7 @@ class Binance(object):
     def _standard_pairs_to_exchange(expairs):
         pass
 
-    def _standardise_objects(self, type, data):
+    def _standardise_object(self, type, data):
         if type == 'tick':
             keymap = {
                 "E": "timestamp",
@@ -100,11 +106,11 @@ class Binance(object):
                 "a": "ask",
                 "s": "symbol"
             }
-            new_tick_dict = Exchange._key_map_to_standard(keymap, data)
+            new_tick_dict = self._key_map_to_standard(keymap, data)
             new_tick_dict['datetime'] = datetime.datetime.fromtimestamp(
-                new_tick_dict['timestamp']
+                new_tick_dict['timestamp'] / 1000.0
             )
-            new_tick_dict['original'] = tickdict
+            new_tick_dict['original'] = data
             new_tick_dict['exchange'] = self.exchange
             return new_tick_dict
         elif type == 'trade':
@@ -129,12 +135,11 @@ class Binance(object):
         else:
             raise ValueError("invalid object type")
 
-    def _handle_response(self, type, response):
+    def _handle_response(self, response, type):
         """
             Take raw json and dictify
         """
-        return _standardise_object(type, data = json.loads(response)['data'])
-
+        return self._standardise_object(type, data = json.loads(response)['data'])
 
     def listen_ticks(self, action, pairs = None):
         """
@@ -166,13 +171,13 @@ class Binance(object):
         if not pairs:
             pairs = self.all_markets
         else:
-            if not isinstance(list, pairs):
+            if not isinstance(pairs, list):
                 raise ValueError(
                 "Pairs must be list or None. Ex: \
                 ['btceth'],['btceth', 'btcada']"
                 )
 
-        channels = [self.channel_map['listen_ticks'].replace('<symbol>', x)
+        channels = [self.channel_map['listen_tick'].replace('<symbol>', pair)
         for pair in pairs]
 
         # Make channels url...
@@ -185,15 +190,24 @@ class Binance(object):
         # If we want all lists we may as well use the all pair channel built in
         # by binance.
         if pairs is None:
-            stream_url = self.wssuri + '/stream?streams=' + self.channel_map['listen_all_ticker']
+            stream_url = self.wssuri + '/stream?streams=' + self.channel_map['listen_all_tick']
 
+        # Move this to a method - DRY
 
-        ws = WSClient(
-            stream_url, self.renew_period_s, handle_method =  action,
-            _handle_data = self._handle_response
-        )
+        factory = WebSocketClientFactory(stream_url)
 
-        ws.listen()
+        MyWs = WSClient
+        MyWs._handle_response = self._handle_response
+        MyWs.handle_method = action
+
+        factory.protocol = MyWs
+        if factory.isSecure:
+            contextFactory = ssl.ClientContextFactory()
+        else:
+            contextFactory = None
+
+        connectWS(factory, contextFactory)
+        reactor.run()
 
     def listen_trades(self, action, pairs = None):
         """
@@ -235,9 +249,19 @@ class Binance(object):
             stream_url += str(channel + '/')
         stream_url[:-1]
 
-        ws = WSClient(
-            stream_url, self.renew_period_s, handle_method =  action,
-            _handle_data = self._handle_response
-        )
+        # Move this to a method - DRY
 
-        ws.listen()
+        factory = WebSocketClientFactory(stream_url)
+
+        MyWs = WSClient
+        MyWs._handle_response = self._handle_response
+        MyWs.handle_method = action
+
+        factory.protocol = MyWs
+        if factory.isSecure:
+            contextFactory = ssl.ClientContextFactory()
+        else:
+            contextFactory = None
+
+        connectWS(factory, contextFactory)
+        reactor.run()
