@@ -29,6 +29,8 @@ exchange = csfxws.Binance()
 
 client = exchange.listen_trades(handle_trade, pairs = ['btceth', 'btcada', 'usdtbtc'])
 ```
+## Status
+This project is a work in progress. It's something I am working on but is not a massive priority for me at the moment. It is functional currently but I would not recommend using it in production. 
 
 ### Contributing
 Contributions are definitely welcome. When contributing please branch this repository, make any changes you would like and then create a pull request.
