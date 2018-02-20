@@ -15,19 +15,18 @@ The aim of this library is to provide a standardised interface for retrieving we
 
 ## Quickstart
 
-While the project does not have a working exchange yet I envision the usage api to look something like this:
+Crypto websockets in 8 lines of code
 
 ```python
-def handle_trade(data):
-    print("trade from {}-{}. Last price {}".format(
-        data['exchange'],
-        data['symbol'],
-        data['price']
-    ))
+from cfxws.exchange import Binance
 
-exchange = csfxws.Binance()
+b = Binance()
 
-client = exchange.listen_trades(handle_trade, pairs = ['btceth', 'btcada', 'usdtbtc'])
+def echo(self, data):
+    print(data)
+
+b.listen_trades(echo, ['adabtc', 'ethbtc'])
+
 ```
 ## Status
 This project is a work in progress. It's something I am working on but is not a massive priority for me at the moment. It is functional currently but I would not recommend using it in production. 
